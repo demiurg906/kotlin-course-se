@@ -20,3 +20,4 @@ pluginManagement {
     }
 }
 rootProject.name = 'kotlin-course-se'
+include '01-just-for-fun'
