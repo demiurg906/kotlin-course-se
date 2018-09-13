@@ -3,13 +3,13 @@ package ru.hse.spb
 import kotlin.math.abs
 import kotlin.math.sign
 
-enum class Orientation(private val value: Int) {
+private enum class Orientation(private val value: Int) {
     TOP(1), BOT(-1);
 
     fun asInt(): Int = value
 }
 
-class Vector(
+private class Vector(
         private val x: Long,
         private val y: Long
 ) : Comparable<Vector> {
@@ -36,11 +36,11 @@ class Vector(
     private fun orientation(): Orientation = if (y < 0L || y == 0L && x < 0L) Orientation.BOT else Orientation.TOP
 }
 
-data class VectorWithIndex(val vector: Vector, val index: Int) : Comparable<VectorWithIndex> {
+private class VectorWithIndex(val vector: Vector, val index: Int) : Comparable<VectorWithIndex> {
     override operator fun compareTo(other: VectorWithIndex): Int = vector.compareTo(other.vector)
 }
 
-class PairOfVectors(
+private class PairOfVectors(
         private val vector1: VectorWithIndex,
         private val vector2: VectorWithIndex
 ) : Comparable<PairOfVectors> {
@@ -64,7 +64,7 @@ class PairOfVectors(
     fun toResult(): Result = Result(vector1.index, vector2.index)
 }
 
-data class Result(val firstIndex: Int, val secondIndex: Int) {
+internal data class Result(val firstIndex: Int, val secondIndex: Int) {
     override fun toString(): String {
         return "${firstIndex + 1} ${secondIndex + 1}"
     }
@@ -95,14 +95,14 @@ private fun parseVector(index: Int, input: String): VectorWithIndex {
 }
 
 
-fun parseAndFindClosestVectors(lines: List<String>): Result {
+internal fun parseAndFindClosestVectors(lines: List<String>): Result {
     val vectors = lines.mapIndexed(::parseVector)
     return findClosestVectors(vectors)
 }
 
 fun main(args: Array<String>) {
-    val n = readLine()?.toInt() ?: throw IllegalArgumentException("Incorrect input")
-    val lines = (1..n).map { readLine() ?: throw IllegalArgumentException("Incorrect input") }
+    val n = readLine()?.toInt() ?: error("Incorrect input")
+    val lines = (1..n).map { readLine() ?: error("Incorrect input") }
     val result = parseAndFindClosestVectors(lines)
     println(result)
 }
