@@ -161,11 +161,11 @@ atomExp
 // ---------------------------------------------------------------------------------
 
 SINGLE_COMMENT
-    : '//' ~[\r\n]* -> skip
+    : SPACES* '//' ~[\r\n]* NEWLINE -> skip
     ;
 
 MULTI_COMMENT
-    : '/*' .*? '*/' -> skip
+    : SPACES* '/*' .*? '*/' NEWLINE -> skip
     ;
 
 fragment Digit
