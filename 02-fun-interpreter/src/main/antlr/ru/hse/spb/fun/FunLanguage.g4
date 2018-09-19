@@ -36,7 +36,7 @@ blockWithBracers
 
 // +
 block
-    : (statements+=statement)*
+    : (statements+=statement NEWLINE*)*
     ;
 
 // -------------------------- statements  --------------------------
