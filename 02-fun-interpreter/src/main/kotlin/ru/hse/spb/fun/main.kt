@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
     val tokens = CommonTokenStream(lexer)
 
     val parser = FunLanguageParser(tokens)
-    parser.file().accept(StatementsEvalVisitor())
+    parser.file().accept(StatementsEvalVisitor(System.out))
 }
 
 // -----------------------------------------------------------------------

@@ -2,8 +2,9 @@ package ru.hse.spb.`fun`
 
 import org.antlr.v4.runtime.Token
 import org.antlr.v4.runtime.tree.TerminalNode
+import java.io.PrintStream
 
-class StatementsEvalVisitor : FunLanguageBaseVisitor<Unit>() {
+class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVisitor<Unit>() {
     companion object {
         const val PRINTLN_FUNCTION = "println"
 
@@ -137,7 +138,7 @@ class StatementsEvalVisitor : FunLanguageBaseVisitor<Unit>() {
 
             if (functionName == PRINTLN_FUNCTION) {
                 val message = parameterValues.joinToString(" ")
-                println(message)
+                output.println(message)
                 return IntType(0)
             }
 
