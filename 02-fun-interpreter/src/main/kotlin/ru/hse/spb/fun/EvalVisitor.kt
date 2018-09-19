@@ -19,14 +19,13 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
         val GE = literalName(FunLanguageLexer.GE)
         val LT = literalName(FunLanguageLexer.LT)
         val LE = literalName(FunLanguageLexer.LE)
-        val AND = literalName(FunLanguageLexer.AND)
-        val OR = literalName(FunLanguageLexer.OR)
 
         private fun literalName(literal: Int) = FunLanguageLexer.VOCABULARY.getLiteralName(literal).replace("'", "")
     }
 
     private var context = Context(null)
-    private val expressionEvaluator = ExprEvalVisitor()
+    private val intExpressionEvaluator = IntExpressionEvaluator()
+    private val logicExpressionEvaluator = LogicExpressionEvaluator()
 
     private fun cutContext(depth: Int) {
         while (context.depth != depth) {
@@ -81,11 +80,11 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
     }
 
     override fun visitIntExpr(ctx: FunLanguageParser.IntExprContext) {
-        ctx.accept(expressionEvaluator)
+        ctx.accept(intExpressionEvaluator)
     }
 
     override fun visitLogicExpr(ctx: FunLanguageParser.LogicExprContext) {
-        ctx.accept(expressionEvaluator)
+        ctx.accept(logicExpressionEvaluator)
     }
 
     private fun FunLanguageParser.ParameterNamesContext.extractParameters() =
@@ -93,19 +92,19 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
 
     override fun visitVariable(ctx: FunLanguageParser.VariableContext) {
         val variable = ctx.Identifier().extractNameFromIdentifier()
-        val value = ctx.intExpr()?.accept(expressionEvaluator)
+        val value = ctx.intExpr()?.accept(intExpressionEvaluator)
 
         context.variables[variable] = value
     }
 
     override fun visitWhileLoop(ctx: FunLanguageParser.WhileLoopContext) {
-        while (ctx.logicExpr().extractValue()) {
+        while (ctx.logicExpr().accept(logicExpressionEvaluator)) {
             ctx.blockWithBracers().accept(this)
         }
     }
 
     override fun visitIfOperator(ctx: FunLanguageParser.IfOperatorContext) {
-        if (ctx.logicExpr().extractValue()) {
+        if (ctx.logicExpr().accept(logicExpressionEvaluator)) {
             ctx.thenBlock.accept(this)
         } else {
             ctx.elseBlock?.accept(this)
@@ -115,49 +114,94 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
     override fun visitAssignment(ctx: FunLanguageParser.AssignmentContext) {
         val variable = ctx.Identifier().extractNameFromIdentifier()
         if (variable !in context.variables) throw EvaluatingException("Variable $variable is not defined")
-        val value = ctx.intExpr().extractValue()
-        context.variables[variable] = IntType(value)
+        val value = ctx.intExpr().accept(intExpressionEvaluator)
+        context.variables[variable] = value
     }
 
     override fun visitReturnStatement(ctx: FunLanguageParser.ReturnStatementContext) {
-        val value = ctx.intExpr().extractValue()
+        val value = ctx.intExpr().accept(intExpressionEvaluator)
         context.returnValue = value
     }
 
-    // ------------------------- Expressions -------------------------
+    // ------------------------- Logic expressions -------------------------
 
-    private inner class ExprEvalVisitor : FunLanguageBaseVisitor<VariableType>() {
-        private fun FunLanguageParser.ArgumentsContext.extractArguments() =
-            args.map { it.accept(expressionEvaluator) }
-                    .map { it as? IntType }
-                    .map { it?.value ?: throw EvaluatingException() }
+    private inner class LogicExpressionEvaluator : FunLanguageBaseVisitor<Boolean>() {
+        override fun visitLogicExpr(ctx: FunLanguageParser.LogicExprContext): Boolean {
+            return when {
+                ctx.logicOrExpr() != null -> ctx.logicOrExpr().accept(this)
+                ctx.logicExpr() != null -> ctx.logicExpr().accept(this)
+                else -> throw EvaluatingException()
+            }
+        }
 
-        override fun visitFunctionCall(ctx: FunLanguageParser.FunctionCallContext): VariableType {
+        override fun visitLogicOrExpr(ctx: FunLanguageParser.LogicOrExprContext): Boolean {
+            val initValue = ctx.`var`.accept(this)
+
+            val vars = ctx.vars.map { it.accept(this) }
+            return vars.fold(initValue) { left, right -> left || right }
+        }
+
+        override fun visitLogicAndExpr(ctx: FunLanguageParser.LogicAndExprContext): Boolean {
+            val initValue = ctx.`var`.accept(this)
+
+            val vars = ctx.vars.map { it.accept(this) }
+            return vars.fold(initValue) { left, right -> left && right }
+        }
+
+        override fun visitAtomLogicExpr(ctx: FunLanguageParser.AtomLogicExprContext): Boolean {
+            return when {
+                ctx.value != null -> ctx.value.accept(this)
+                ctx.exp != null -> ctx.exp.accept(this)
+
+                else -> throw EvaluatingException()
+            }
+        }
+
+        override fun visitEqualityExpr(ctx: FunLanguageParser.EqualityExprContext): Boolean {
+            val value1 = ctx.var1.accept(intExpressionEvaluator)
+            val value2 = ctx.var2.accept(intExpressionEvaluator)
+
+            return when (ctx.op.text) {
+                EQUAL -> value1 == value2
+                NOT_EQUAL -> value1 != value2
+                LT -> value1 < value2
+                LE -> value1 <= value2
+                GT -> value1 > value2
+                GE -> value1 >= value2
+                else -> throw EvaluatingException()
+            }
+        }
+    }
+
+    // ------------------------- Int expressions -------------------------
+
+    private inner class IntExpressionEvaluator : FunLanguageBaseVisitor<Int>() {
+        private fun FunLanguageParser.ArgumentsContext.extractArguments() = args.map { it.accept(intExpressionEvaluator) }
+
+        override fun visitFunctionCall(ctx: FunLanguageParser.FunctionCallContext): Int {
             val functionName = ctx.Identifier().extractNameFromIdentifier()
             val parameterValues = ctx.arguments().extractArguments()
 
             if (functionName == PRINTLN_FUNCTION) {
                 val message = parameterValues.joinToString(" ")
                 output.println(message)
-                return IntType(0)
+                return 0
             }
 
             val startDepth = context.depth
             context = Context(context)
             val (parameterNames, function) = context.functions[functionName] ?: throw EvaluatingException("Function $functionName not declared")
-            parameterNames.zip(parameterValues).forEach { (name, value) -> context.variables[name] = IntType(value) }
+            parameterNames.zip(parameterValues).forEach { (name, value) -> context.variables[name] = value }
 
             function.accept(this@StatementsEvalVisitor)
 
             val returnValue = context.returnValue
             cutContext(startDepth)
 
-            return IntType(returnValue ?: 0)
+            return returnValue ?: 0
         }
 
-        // ------------------------- Arithmetic -------------------------
-
-        override fun visitIntExpr(ctx: FunLanguageParser.IntExprContext): VariableType {
+        override fun visitIntExpr(ctx: FunLanguageParser.IntExprContext): Int {
             return when {
                 ctx.additionExp() != null -> ctx.additionExp().accept(this)
                 ctx.functionCall() != null -> ctx.functionCall().accept(this)
@@ -169,25 +213,24 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
             }
         }
 
-        override fun visitAdditionExp(ctx: FunLanguageParser.AdditionExpContext): VariableType {
-            val initValue = (ctx.`var`.accept(this) as? IntType)?.value ?: throw EvaluatingException()
+        override fun visitAdditionExp(ctx: FunLanguageParser.AdditionExpContext): Int {
+            val initValue = ctx.`var`.accept(this)
 
-            val vars = ctx.vars.map { (it.accept(this) as? IntType)?.value ?: throw EvaluatingException() }
-            val resultValue =vars.zip(ctx.ops).fold(initValue) { left, (right, operation) ->
+            val vars = ctx.vars.map { it.accept(this) }
+            return vars.zip(ctx.ops).fold<Pair<Int, Token>, Int>(initValue) { left, (right, operation) ->
                 when (operation.text) {
                     PLUS -> left + right
                     MINUS -> left - right
                     else -> throw EvaluatingException()
                 }
             }
-            return IntType(resultValue)
         }
 
-        override fun visitMultiplyExp(ctx: FunLanguageParser.MultiplyExpContext): VariableType {
-            val initValue = (ctx.`var`.accept(this) as? IntType)?.value ?: throw EvaluatingException()
+        override fun visitMultiplyExp(ctx: FunLanguageParser.MultiplyExpContext): Int {
+            val initValue = ctx.`var`.accept(this)
 
-            val vars = ctx.vars.map { (it.accept(this) as? IntType)?.value ?: throw EvaluatingException() }
-            val resultValue = vars.zip(ctx.ops).fold(initValue) { left, (right, operation) ->
+            val vars = ctx.vars.map { it.accept(this) }
+            return vars.zip(ctx.ops).fold(initValue) { left, (right, operation) ->
                 when (operation.text) {
                     // TODO: ctx.MULT == null
                     MULT -> left * right
@@ -196,10 +239,9 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                     else -> throw EvaluatingException("${operation.text}, $MULT")
                 }
             }
-            return IntType(resultValue)
         }
 
-        override fun visitAtomExp(ctx: FunLanguageParser.AtomExpContext): VariableType {
+        override fun visitAtomExp(ctx: FunLanguageParser.AtomExpContext): Int {
             return when {
                 ctx.n != null -> ctx.n.extractValueFromLiteral()
                 ctx.id != null -> ctx.id.extractVariableFromIdentifier()
@@ -208,64 +250,9 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 else -> throw EvaluatingException()
             }
         }
-
-        // ------------------------- Logic -------------------------
-
-        override fun visitLogicExpr(ctx: FunLanguageParser.LogicExprContext): VariableType {
-            return when {
-                ctx.logicOrExpr() != null -> ctx.logicOrExpr().accept(this)
-                ctx.logicExpr() != null -> ctx.logicExpr().accept(this)
-                else -> throw EvaluatingException()
-            }
-        }
-
-        override fun visitLogicOrExpr(ctx: FunLanguageParser.LogicOrExprContext): VariableType {
-            val initValue = (ctx.`var`.accept(this) as? BoolType)?.value ?: throw EvaluatingException()
-
-            val vars = ctx.vars.map { (it.accept(this) as? BoolType)?.value ?: throw EvaluatingException() }
-            val resultValue = vars.fold(initValue) { left, right -> left || right }
-            return BoolType(resultValue)
-        }
-
-        override fun visitLogicAndExpr(ctx: FunLanguageParser.LogicAndExprContext): VariableType {
-            val initValue = (ctx.`var`.accept(this) as? BoolType)?.value ?: throw EvaluatingException()
-
-            val vars = ctx.vars.map { (it.accept(this) as? BoolType)?.value ?: throw EvaluatingException() }
-            val resultValue = vars.fold(initValue) { left, right -> left && right }
-            return BoolType(resultValue)
-        }
-
-        override fun visitAtomLogicExpr(ctx: FunLanguageParser.AtomLogicExprContext): VariableType {
-            return when {
-                ctx.value != null -> ctx.value.accept(this)
-                ctx.`var` != null -> ctx.`var`.extractVariableFromIdentifier()
-                ctx.exp != null -> ctx.exp.accept(this)
-
-                else -> throw EvaluatingException()
-            }
-        }
-
-        override fun visitEqualityExpr(ctx: FunLanguageParser.EqualityExprContext): VariableType {
-            val value1 = ctx.var1.extractValue()
-            val value2 = ctx.var2.extractValue()
-
-            val result = when (ctx.op.text) {
-                EQUAL -> value1 == value2
-                NOT_EQUAL -> value1 != value2
-                LT -> value1 < value2
-                LE -> value1 <= value2
-                GT -> value1 > value2
-                GE -> value1 >= value2
-                else -> throw EvaluatingException()
-            }
-            return BoolType(result)
-        }
     }
 
     // ------------------------- Utils -------------------------
-
-    private fun FunLanguageParser.IntExprContext.extractValue() = (accept(expressionEvaluator)as? IntType)?.value ?: throw EvaluatingException()
-    private fun FunLanguageParser.LogicExprContext.extractValue() = (accept(expressionEvaluator) as? BoolType)?.value ?: throw EvaluatingException()
 
     private fun TerminalNode.extractNameFromIdentifier() = symbol.text
     private fun TerminalNode.extractVariableFromIdentifier() = symbol.extractVariableFromIdentifier()
@@ -273,14 +260,11 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
     private fun TerminalNode.extractValueFromLiteral() = symbol.extractValueFromLiteral()
     private fun Token.extractNameFromIdentifier() = text
 
-    private fun Token.extractValueFromLiteral(): IntType {
-        val value = text.toIntOrNull() ?: throw EvaluatingException("Illegal integer literal: ${text}")
-        return IntType(value)
-    }
+    private fun Token.extractValueFromLiteral(): Int =
+            text.toIntOrNull() ?: throw EvaluatingException("Illegal integer literal: $text")
 
-    private fun Token.extractVariableFromIdentifier(): VariableType {
-        return context.variables[text] ?: throw EvaluatingException("Undefined identifier $text")
-    }
+    private fun Token.extractVariableFromIdentifier(): Int = context.variables[text] ?: throw EvaluatingException("Undefined identifier $text")
+
 }
 
 class EvaluatingException(message: String? = null) : Exception(message)

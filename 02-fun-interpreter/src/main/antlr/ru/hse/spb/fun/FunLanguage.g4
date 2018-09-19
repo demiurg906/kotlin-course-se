@@ -130,7 +130,6 @@ logicAndExpr
 // +
 atomLogicExpr
     : value=equalityExpr
-    | var=Identifier
     | '(' SPACES* exp=logicOrExpr SPACES* ')'
     ;
 
@@ -161,11 +160,11 @@ atomExp
 // ---------------------------------------------------------------------------------
 
 SINGLE_COMMENT
-    : SPACES* '//' ~[\r\n]* NEWLINE -> skip
+    : SPACES* '//' ~[\r\n]* [\r\n] -> skip
     ;
 
 MULTI_COMMENT
-    : SPACES* '/*' .*? '*/' NEWLINE -> skip
+    : SPACES* '/*' .*? '*/' [\r\n]? -> skip
     ;
 
 fragment Digit

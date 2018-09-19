@@ -11,9 +11,9 @@ class Context(val parentContext: Context?) {
     }
 
     inner class VariableMap {
-        private val variables: MutableMap<String, VariableType?> = mutableMapOf()
-        operator fun get(variable: String): VariableType? = variables[variable] ?: parentContext?.variables?.get(variable)
-        operator fun set(variable: String, value: VariableType?) {
+        private val variables: MutableMap<String, Int?> = mutableMapOf()
+        operator fun get(variable: String): Int? = variables[variable] ?: parentContext?.variables?.get(variable)
+        operator fun set(variable: String, value: Int?) {
             variables[variable] = value
         }
         operator fun contains(variable: String) = variable in variables
