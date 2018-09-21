@@ -1,6 +1,6 @@
 package ru.hse.spb.`fun`
 
-class TreePrinterVisitor(private val sb: StringBuilder) : FunLanguageBaseVisitor<Unit>() {
+class TreePrinterVisitor : FunLanguageBaseVisitor<Unit>() {
     companion object {
         private const val TAB = "  "
         private const val L_BR = "("
@@ -24,12 +24,18 @@ class TreePrinterVisitor(private val sb: StringBuilder) : FunLanguageBaseVisitor
         private const val ASSIGNMENT = " = "
     }
 
+    private val sb = StringBuilder()
+
     private var indent = -1
     private val tab: String
         get() = TAB.repeat(indent)
 
     override fun toString(): String {
-        return sb.toString()
+//        for (line in sb.toString().lines()) {
+//            val trimmed = line.trimEnd()
+//            val x = 0
+//        }
+        return sb.toString().lines().joinToString(NEWLINE) { it.trimEnd() }
     }
 
     // ------------------------- Blocks -------------------------
@@ -70,7 +76,7 @@ class TreePrinterVisitor(private val sb: StringBuilder) : FunLanguageBaseVisitor
     }
 
     override fun visitFunctionDef(ctx: FunLanguageParser.FunctionDefContext) {
-        sb.append(NEWLINE).append(FUN).append(ctx.Identifier().text)
+        sb.append(NEWLINE).append(tab).append(FUN).append(ctx.Identifier().text)
         ctx.parameterNames().accept(this)
         ctx.blockWithBracers().accept(this)
     }
