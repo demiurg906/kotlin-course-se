@@ -68,15 +68,18 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 ?: ctx.ifOperator()
                 ?: ctx.assignment()
                 ?: ctx.returnStatement()
-                ?: throw EvaluatingException()
+                ?: throw FunInterpreterException(ctx)
         childCtx.accept(this)
     }
 
     override fun visitFunctionDef(ctx: FunLanguageParser.FunctionDefContext) {
         val functionName = ctx.Identifier().extractNameFromIdentifier()
         val parameterNames = ctx.parameterNames().extractParameters()
-
-        context.functions[functionName] = FunctionType(parameterNames, ctx.blockWithBracers())
+        try {
+            context.functions[functionName] = FunctionType(parameterNames, ctx.blockWithBracers())
+        } catch (e: FunctionOverrideException) {
+            throw FunInterpreterException(ctx, e.message)
+        }
     }
 
     override fun visitIntExpr(ctx: FunLanguageParser.IntExprContext) {
@@ -113,7 +116,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
 
     override fun visitAssignment(ctx: FunLanguageParser.AssignmentContext) {
         val variable = ctx.Identifier().extractNameFromIdentifier()
-        if (variable !in context.variables) throw EvaluatingException("Variable $variable is not defined")
+        if (variable !in context.variables) throw FunInterpreterException(ctx, "Variable '$variable' is not defined")
         val value = ctx.intExpr().accept(intExpressionEvaluator)
         context.variables[variable] = value
     }
@@ -130,7 +133,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
             return when {
                 ctx.logicOrExpr() != null -> ctx.logicOrExpr().accept(this)
                 ctx.logicExpr() != null -> ctx.logicExpr().accept(this)
-                else -> throw EvaluatingException()
+                else -> throw FunInterpreterException(ctx)
             }
         }
 
@@ -153,7 +156,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 ctx.value != null -> ctx.value.accept(this)
                 ctx.exp != null -> ctx.exp.accept(this)
 
-                else -> throw EvaluatingException()
+                else -> throw FunInterpreterException(ctx)
             }
         }
 
@@ -168,7 +171,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 LE -> value1 <= value2
                 GT -> value1 > value2
                 GE -> value1 >= value2
-                else -> throw EvaluatingException()
+                else -> throw FunInterpreterException(ctx)
             }
         }
     }
@@ -190,7 +193,8 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
 
             val startDepth = context.depth
             context = Context(context)
-            val (parameterNames, function) = context.functions[functionName] ?: throw EvaluatingException("Function $functionName not declared")
+            val (parameterNames, function) = context.functions[functionName]
+                    ?: throw FunInterpreterException(ctx, "Function '$functionName' not declared")
             parameterNames.zip(parameterValues).forEach { (name, value) -> context.variables[name] = value }
 
             function.accept(this@StatementsEvalVisitor)
@@ -209,7 +213,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 ctx.Literal() != null -> ctx.Literal().extractValueFromLiteral()
                 ctx.intExpr() != null -> ctx.intExpr().accept(this)
 
-                else -> throw EvaluatingException()
+                else -> throw FunInterpreterException(ctx)
             }
         }
 
@@ -221,7 +225,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 when (operation.text) {
                     PLUS -> left + right
                     MINUS -> left - right
-                    else -> throw EvaluatingException()
+                    else -> throw FunInterpreterException(ctx)
                 }
             }
         }
@@ -232,11 +236,10 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
             val vars = ctx.vars.map { it.accept(this) }
             return vars.zip(ctx.ops).fold(initValue) { left, (right, operation) ->
                 when (operation.text) {
-                    // TODO: ctx.MULT == null
                     MULT -> left * right
                     DIV -> left / right
                     MOD-> left % right
-                    else -> throw EvaluatingException("${operation.text}, $MULT")
+                    else -> throw FunInterpreterException(ctx)
                 }
             }
         }
@@ -247,7 +250,7 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
                 ctx.id != null -> ctx.id.extractVariableFromIdentifier()
                 ctx.exp != null -> ctx.exp.accept(this)
 
-                else -> throw EvaluatingException()
+                else -> throw FunInterpreterException(ctx)
             }
         }
     }
@@ -261,10 +264,9 @@ class StatementsEvalVisitor(private val output: PrintStream): FunLanguageBaseVis
     private fun Token.extractNameFromIdentifier() = text
 
     private fun Token.extractValueFromLiteral(): Int =
-            text.toIntOrNull() ?: throw EvaluatingException("Illegal integer literal: $text")
+            text.toIntOrNull() ?: throw FunInterpreterException(this, "Illegal integer literal: '$text'")
 
-    private fun Token.extractVariableFromIdentifier(): Int = context.variables[text] ?: throw EvaluatingException("Undefined identifier $text")
-
+    private fun Token.extractVariableFromIdentifier(): Int = context.variables[text]
+            ?: throw FunInterpreterException(this, "Undefined identifier '$text'")
 }
 
-class EvaluatingException(message: String? = null) : Exception(message)

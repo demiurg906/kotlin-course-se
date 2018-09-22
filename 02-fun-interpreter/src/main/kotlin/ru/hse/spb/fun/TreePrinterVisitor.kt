@@ -71,7 +71,7 @@ class TreePrinterVisitor : FunLanguageBaseVisitor<Unit>() {
                 ?: ctx.ifOperator()
                 ?: ctx.assignment()
                 ?: ctx.returnStatement()
-                ?: throw EvaluatingException()
+                ?: return
         childCtx.accept(this)
     }
 
@@ -148,7 +148,7 @@ class TreePrinterVisitor : FunLanguageBaseVisitor<Unit>() {
 
     override fun visitArguments(ctx: FunLanguageParser.ArgumentsContext) {
         sb.append(L_BR)
-        if (ctx.isEmpty) {
+        if (ctx.args.isEmpty()) {
             sb.append(R_BR)
             return
         }

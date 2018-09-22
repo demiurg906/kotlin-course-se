@@ -23,8 +23,10 @@ class Context(val parentContext: Context?) {
         private val functions: MutableMap<String, FunctionType> = mutableMapOf()
         operator fun get(function: String): FunctionType? = functions[function] ?: parentContext?.functions?.get(function)
         operator fun set(function: String, value: FunctionType) {
-            if (function in functions) throw EvaluatingException("You try override function $function")
+            if (function in functions) throw FunctionOverrideException("You try to override function '$function'")
             functions[function] = value
         }
     }
 }
+
+class FunctionOverrideException(message: String? = null) : Exception(message)
