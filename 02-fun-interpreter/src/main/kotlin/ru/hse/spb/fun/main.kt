@@ -1,3 +1,5 @@
+@file:JvmName("Main")
+
 package ru.hse.spb.`fun`
 
 import org.antlr.v4.runtime.CharStreams
