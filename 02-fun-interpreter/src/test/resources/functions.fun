@@ -9,5 +9,8 @@ fun foo(x) {
 }
 
 fun bar() {
-    return 1
+
 }
+
+println(foo(2))
+println(bar())
