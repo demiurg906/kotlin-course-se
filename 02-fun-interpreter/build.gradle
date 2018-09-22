@@ -8,3 +8,10 @@ dependencies {
     antlr 'org.antlr:antlr4:4.7.1'
     compile group: 'org.antlr', name: 'antlr4', version: '4.7.1'
 }
+
+
+mainClassName = 'ru.hse.spb.fun.Main'
+
+run {
+    dependsOn generateGrammarSource
+}
