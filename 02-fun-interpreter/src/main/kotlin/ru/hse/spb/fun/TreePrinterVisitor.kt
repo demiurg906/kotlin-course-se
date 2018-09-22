@@ -31,10 +31,6 @@ class TreePrinterVisitor : FunLanguageBaseVisitor<Unit>() {
         get() = TAB.repeat(indent)
 
     override fun toString(): String {
-//        for (line in sb.toString().lines()) {
-//            val trimmed = line.trimEnd()
-//            val x = 0
-//        }
         return sb.toString().lines().joinToString(NEWLINE) { it.trimEnd() }
     }
 

@@ -7,3 +7,5 @@ class FunInterpreterException(val line: Int, val position: Int, message: String?
     constructor(token: Token, message: String? = null) : this(token.line, token.charPositionInLine, message)
     constructor(ctx: ParserRuleContext, message: String? = null) : this(ctx.start, message)
 }
+
+class FunctionOverrideException(message: String? = null) : Exception(message)

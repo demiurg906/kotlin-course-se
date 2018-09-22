@@ -1,6 +1,7 @@
 package ru.hse.spb.`fun`
 
-import org.antlr.v4.runtime.*
+import org.antlr.v4.runtime.CharStreams
+import org.antlr.v4.runtime.CommonTokenStream
 import java.io.File
 
 fun main(args: Array<String>) {
@@ -9,7 +10,6 @@ fun main(args: Array<String>) {
         println("Not enough arguments")
         return
     }
-
 
     try {
         val lexer = FunLanguageLexer(CharStreams.fromString(readFileContent(fileName)))
@@ -21,13 +21,8 @@ fun main(args: Array<String>) {
         parser.removeErrorListeners()
         parser.addErrorListener(ThrowingErrorListener)
         parser.file().accept(StatementsEvalVisitor(System.out))
-
-//        val printerVisitor = TreePrinterVisitor()
-//        parser.file().accept(printerVisitor)
-//        println(printerVisitor.toString())
     } catch (e: FunInterpreterException) {
         println("Error at ${e.line}:${e.position}: ${e.message}")
-//        e.printStackTrace()
     }
 
 }
@@ -40,37 +35,3 @@ fun readFileContent(fileName: String): String {
     }
     return lines.joinToString("\n")
 }
-
-// -----------------------------------------------------------------------
-
-object ThrowingErrorListener : BaseErrorListener() {
-    override fun syntaxError(recognizer: Recognizer<*, *>?, offendingSymbol: Any?, line: Int, charPositionInLine: Int, msg: String?, e: RecognitionException?) {
-        throw FunInterpreterException(line, charPositionInLine, "Can't parse input");
-    }
-}
-
-// -----------------------------------------------------------------------
-
-class TokenStreamIterator(private val stream: TokenStream) {
-    private var current = 0
-
-    operator fun next(): Token {
-        val token = stream.get(current)
-        current += 1
-        return token
-    }
-
-    operator fun hasNext(): Boolean = current < stream.size()
-}
-
-operator fun TokenStream.iterator() = TokenStreamIterator(this)
-
-fun TokenStream.toList(): List<Token> {
-    val res = mutableListOf<Token>()
-    for (token in this) {
-        res.add(token)
-    }
-    return res
-}
-
-fun TokenStream.println() = this.toList().forEach { println("${FunLanguageLexer.VOCABULARY.getSymbolicName(it.type)}, $it") }

@@ -28,5 +28,3 @@ class Context(val parentContext: Context?) {
         }
     }
 }
-
-class FunctionOverrideException(message: String? = null) : Exception(message)
