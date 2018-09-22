@@ -54,7 +54,7 @@ functionDef
     ;
 
 parameterNames
-    : '(' (params+=Identifier SPACES* (',' SPACES* params+=Identifier)* SPACES*)? ')'
+    : '(' (params+=Identifier SPACES* (',' SPACES* params+=Identifier)*)? SPACES* ')'
     ;
 
 variable
@@ -97,7 +97,7 @@ functionCall
     ;
 
 arguments
-    : '(' SPACES* (args+=intExpr (SPACES* ',' SPACES* args+=intExpr)* SPACES*)? ')'
+    : '(' (args+=intExpr SPACES* (',' SPACES* args+=intExpr)*)? SPACES* ')'
     ;
 
 // -------------------------- logic --------------------------
