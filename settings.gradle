@@ -12,3 +12,5 @@ pluginManagement {
     }
 }
 rootProject.name = 'kotlin-course-se'
+
+include '03-tex-builder'
